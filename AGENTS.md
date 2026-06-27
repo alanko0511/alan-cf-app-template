@@ -2,6 +2,8 @@
 
 Orientation for agents working in this repo. It's a full-stack template: a single Cloudflare Worker serving a Hono API and a React SPA. This file is the architecture map and the list of non-obvious gotchas — read it before changing build config, routing, or the API/client boundary. The files referenced here are real; open them rather than trusting a copy.
 
+> **Lost the demo code?** This doc derives from a template whose `todos` demo shows every pattern working end-to-end. If that demo has been deleted from this repo (it's meant to be — see "Customizing") and you want a live reference, pull it from the upstream template on GitHub instead of reconstructing it from memory: `gh repo view alanko0511/alan-cf-app-template`, then `gh api repos/alanko0511/alan-cf-app-template/contents/<path>` (or just browse https://github.com/alanko0511/alan-cf-app-template). Good files to look at: `src/web/routes/_index.tsx` (RPC + react-query), `src/worker/routes/todos.ts` + `todos.$id.ts` (DB CRUD), `src/worker/db/schema/todos.ts` (table).
+
 ## Stack
 
 | Concern         | Choice                                          |
@@ -122,14 +124,53 @@ vitest.config.ts         cloudflareTest() plugin; reuses wrangler.json
 
 - **Route file names mirror Remix flat-routes** (`_index`, `$id` dynamic segment, `parent.child` nesting), but routing is wired **manually** — there's no file-based router. The names are convention; the wiring is explicit in `_router.ts` (Hono `.route()`) and `_router.tsx` (wouter `<Switch>`).
 - **Adding an API resource:** create `src/worker/routes/<name>.ts` exporting a chained Hono sub-app — `export default new Hono<AppEnv>().get(...)…` (use the `AppEnv` generic from `lib/app-context.ts`, not `{ Bindings: Env }`, so `c.var.db` is typed — see invariant #12). Mount it in `_router.ts` with `.route("/api/<name>", <name>)`. Read the DB via `c.var.db` (don't call `getDb` in handlers — the middleware already did). Validate bodies with `zValidator("json", zodSchema)` (and `zValidator("param", …)` for uuid params) so the request type reaches the `hc` client. Item routes go in `<name>.$id.ts`.
+- **Accessing the database:** the per-request Drizzle client is `c.var.db` — use it as a standard Drizzle query builder over the tables in `db/schema/` (imported from the barrel: `import { todos } from "../db/schema/index.ts"`). Template-specific rules: it's set by `appContextMiddleware`, so **never call `getDb` yourself in a handler**, and **never `.end()` the client** (invariant #9 — causes hangs). See `routes/todos.ts` + `todos.$id.ts` for the CRUD shapes if the demo is still around.
 - **Adding a DB table:** create `src/worker/db/schema/<name>.ts` (`pgTable(...)`, columns in camelCase — the `snake_case` casing in `drizzle.config.ts` + `getDb` maps them to snake_case), export `$inferSelect`/`$inferInsert` types, then add one `export * from "./<name>.ts"` line to `db/schema/index.ts` (the barrel both `drizzle.config.ts` and `getDb` read). In dev, `bun run db:push`. For prod, `bun run db:generate` then `db:migrate`.
-- **Calling the API from the web:** import `api` from `lib/rpc.ts` and use it inside TanStack Query — `api.todos.$get()`, `api.todos.$post({ json })`, `api.todos[":id"].$patch({ param: { id }, json })`. `param` and `json` are typed from the Worker route; responses are typed too.
+- **Calling the API from the web:** import `api` from `lib/rpc.ts` and use it inside TanStack Query. `param` and `json` are typed from the Worker route; responses are typed too. The canonical end-to-end pattern (mirrors `routes/_index.tsx` — kept here so it survives a frontend rewrite):
+
+  ```tsx
+  import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+  import { api } from "../lib/rpc.ts";
+
+  // Read: GET /api/todos
+  function useTodos() {
+    return useQuery({
+      queryKey: ["todos"],
+      queryFn: async () => {
+        const res = await api.todos.$get();
+        if (!res.ok) throw new Error("Failed to load todos");
+        return res.json(); // typed from the Worker route
+      },
+    });
+  }
+
+  // Write: POST /api/todos, then refetch
+  function useAddTodo() {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: async (input: { title: string }) => {
+        const res = await api.todos.$post({ json: input }); // `json` is typed
+        if (!res.ok) throw new Error("Failed to add todo");
+        return res.json();
+      },
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["todos"] }),
+    });
+  }
+
+  // Dynamic segments use bracket syntax; `param` + `json` are both typed:
+  //   api.todos[":id"].$patch({ param: { id }, json: { completed } })
+  //   api.todos[":id"].$delete({ param: { id } })
+  ```
 - **Nested layouts (the `<Outlet/>` equivalent):** wouter has no `<Outlet/>`. A layout renders `{children}` as the outlet slot; `_router.tsx` wraps the nested routes in it under a `<Route path="/x" nest>`. `nest` makes child paths/links relative to the prefix. See `routes/settings.tsx` + its `settings.*` children.
 - **Tests run in workerd, not Node.** `@cloudflare/vitest-pool-workers` (Vitest 4) runs tests in the real runtime via `vitest.config.ts`'s `cloudflareTest()` plugin, reusing `wrangler.json`. Test utilities: `env` + `exports` (`exports.default.fetch()` for full-Worker integration) from `cloudflare:workers`; `createExecutionContext`/`waitOnExecutionContext` (direct-handler unit) from `cloudflare:test`. The types are at the `@cloudflare/vitest-pool-workers/types` subpath, not the package root — `test/tsconfig.json` sets `"types": ["@cloudflare/vitest-pool-workers/types"]`. `test/` is wired into `tsc -b` (4th project reference), so `bun run build` type-checks tests too. These tests hit Postgres — see invariant #10 for the prerequisites.
 
 ## Customizing
 
-Swap freely, keeping the patterns intact: `index.css` (styles), the page components under `web/routes/`, the `todos` API resource and its `db/schema/todos.ts` table, and any added packages. After a clone: rename `name` in `package.json` + `wrangler.json`, bump `compatibility_date`, replace the Hyperdrive `id` placeholder (invariant #8), and point `localConnectionString` / `DATABASE_URL` at your database.
+**The todos feature is a throwaway demo — delete it wholesale when building a real app.** It exists only to exercise the stack end-to-end (typed RPC, react-query, Drizzle, Hyperdrive, zod, tests). The *patterns* it demonstrates are documented as copyable snippets above ("Calling the API from the web", "Accessing the database"), so you lose nothing by removing the code. When asked to adapt this template into an app, the expected move is to **remove the demo, not refactor it in place**.
+
+The demo surface to delete: `web/routes/_index.tsx` (todos UI), `worker/routes/todos.ts` + `todos.$id.ts`, `db/schema/todos.ts` (and its `export *` line in `db/schema/index.ts`), `db/seed.ts`'s todo rows, and the todo cases in `test/api.test.ts`. Keep the scaffolding that isn't demo-specific: `lib/rpc.ts`, `lib/db.ts`, `lib/app-context.ts`, the router files, build/config, and the `web/routes/about.*` + `settings.*` pages (kept as routing/layout examples — delete if unwanted).
+
+Keep the patterns intact when you swap: `index.css` (styles) and any added packages are free to change. After a clone: rename `name` in `package.json` + `wrangler.json`, bump `compatibility_date`, replace the Hyperdrive `id` placeholder (invariant #8), and point `localConnectionString` / `DATABASE_URL` at your database.
 
 **Adding a binding (D1/KV/R2/…):** add it to `wrangler.json`, run `bun run cf-typegen` to refresh `Env`, then use `c.env.<BINDING>` in the Worker. If Worker code (not just the Worker project) references it, also add a minimal field to the web `Env` shim (invariant #3).
 
