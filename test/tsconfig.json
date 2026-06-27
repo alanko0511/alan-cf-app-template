@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* The `./types` subpath declares the `cloudflare:test` module (the package's
+       main types entry is the pool/config API, not the ambient module).
+       worker-configuration.d.ts supplies the Workers runtime globals + Env. */
+    "types": ["@cloudflare/vitest-pool-workers/types"]
+  },
+  "include": ["./**/*.ts", "../worker-configuration.d.ts"]
+}

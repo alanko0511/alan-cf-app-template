@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "fullstack-starter",
+  "compatibility_date": "2026-06-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./src/worker/index.ts",
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_YOUR_HYPERDRIVE_ID",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/app"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

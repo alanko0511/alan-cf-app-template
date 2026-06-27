@@ -1,0 +1,47 @@
+{
+  "name": "fullstack-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "bun run build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun run src/worker/db/seed.ts"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.0",
+    "@tanstack/react-query": "^5.101.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.27",
+    "postgres": "^3.4.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "wouter": "^3.10.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.42.3",
+    "@cloudflare/vitest-pool-workers": "^0.16.20",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.105.0"
+  }
+}

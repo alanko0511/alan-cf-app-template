@@ -1,0 +1,26 @@
+# Local Postgres for development. Production uses your own managed Postgres
+# (Neon, Supabase, RDS, …) fronted by Cloudflare Hyperdrive — see AGENTS.md.
+#
+#   docker compose up -d      # start Postgres in the background
+#   docker compose down       # stop it (data is kept under ./tmp/postgres)
+#
+# Data lives under ./tmp/postgres, which is gitignored. Postgres 18's image
+# mounts the volume at /var/lib/postgresql (PGDATA is /var/lib/postgresql/18/docker),
+# so the actual cluster files end up at ./tmp/postgres/18/docker.
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./tmp/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
