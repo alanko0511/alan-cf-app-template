@@ -18,8 +18,14 @@ export function Router() {
 
       {/*
         Nested layout. `nest` matches `/settings` as a prefix and makes the
-        inner routes' paths relative to it. SettingsLayout renders an outlet
-        slot; this inner <Switch> is what fills it (wouter's <Outlet/> stand-in).
+        inner routes' paths AND links relative to it (the router base becomes
+        `/settings`). SettingsLayout renders an outlet slot; this inner <Switch>
+        is what fills it (wouter's <Outlet/> stand-in).
+
+        Because the base shifts, links rendered inside this section use relative
+        paths (`/account`, not `/settings/account`) and the `~` escape to reach
+        top-level routes. See AGENTS.md › "Routing" for the full rule and the
+        doubling failure mode it prevents.
       */}
       <Route path="/settings" nest>
         <SettingsLayout>
